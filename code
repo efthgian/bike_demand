@@ -1,0 +1,269 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV 
+from sklearn.linear_model import LinearRegression
+import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+import itertools
+from sklearn.metrics import mean_squared_error
+from sklearn import tree
+from six import StringIO
+import pydot
+
+#First Impression
+data = pd.read_csv("/path")
+data.head(5)
+data.shape
+data.info()
+data = data.astype({'Date':'datetime64[ns]'})
+data.isnull().sum()
+data['Functioning Day'].unique()
+data[data['Functioning Day']=='No']['Rented Bike Count'].unique()
+data = data[data['Functioning Day'] == 'Yes']
+data = data.drop('Functioning Day', axis = 1) 
+data.shape
+data = data.set_index('Date')
+data['Month'] = data.index.month_name()
+data['Day'] = data.index.day_name()
+data.head(5)
+data.describe()
+
+#Histograms
+plt.bar(x=data.index, height=data['Rented Bike Count'])
+plt.xlabel('Date')
+plt.ylabel('Rented Bike Count')
+for numcolumn in data.select_dtypes(exclude=[object]).columns:
+  plt.figure()
+  sns.displot(data[numcolumn])
+  plt.axvline(x=data[numcolumn].mean(), color='r', linestyle='--')
+
+data['Holiday'].unique()
+data.index[data['Holiday']=='Holiday'].unique()
+data.groupby('Holiday').get_group('Holiday')
+sns.displot(data['Holiday'])
+
+#Correlation
+sns.heatmap(data.corr(), xticklabels = data.corr().columns, yticklabels = data.corr().columns, annot = True)
+
+#Graphs
+for numcol in data.select_dtypes(exclude=[object]).columns:
+    for catcolumn in data.select_dtypes(include=[object]).columns:
+        plt.figure()
+        plt.bar(data.groupby(catcolumn).mean()[numcol].index, data.groupby(catcolumn).mean()[numcol])
+        plt.xlabel(catcolumn)
+        plt.ylabel(numcol)
+        plt.xticks(rotation=45, ha='right')
+
+for catcolumn in data.select_dtypes(include=[object]).columns:
+    plt.figure()
+    for uval in data[catcolumn].unique():
+        plt.plot(data[data[catcolumn]==uval].groupby('Hour').mean()['Rented Bike Count'].index, data[data[catcolumn]==uval].groupby('Hour').mean()['Rented Bike Count'], label=uval)
+    plt.xlabel('Hour')
+    plt.ylabel('Rented Bike Count')
+    plt.legend()
+
+#New columns
+def daytotype(row):
+    if row['Day'] in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']:
+        val = 'Weekday'
+    else:
+        val = 'Weekend'
+    return val
+
+data['Type of Day'] = data.apply(daytotype, axis=1)
+ 
+def combineddaytype(row):
+    if row['Type of Day'] == 'Weekend' and row['Holiday'] == 'Holiday':
+        val = 'Hend'
+    elif row['Type of Day'] == 'Weekend' and row['Holiday'] == 'No Holiday':
+        val = 'NHend'
+    elif row['Type of Day'] == 'Weekday' and row['Holiday'] == 'No Holiday':
+        val = 'NHday'
+    else:
+        val = 'Hday'
+    return val
+
+data['Combined Type of Day'] = data.apply(combineddaytype, axis=1)
+
+plt.figure()
+for uval in data['Combined Type of Day'].unique():
+    plt.plot(data[data['Combined Type of Day']==uval].groupby('Hour').mean()['Rented Bike Count'].index, data[data['Combined Type of Day']==uval].groupby('Hour').mean()['Rented Bike Count'], label=uval)
+plt.xlabel('Hour')
+plt.ylabel('Rented Bike Count')
+plt.legend()
+
+data.index[data['Combined Type of Day']=='Hend'].unique()
+
+def daytype(row):
+  if row['Combined Type of Day'] == 'NHday':
+    val = 'Workday'
+  else:
+    val = 'Dayoff'
+  return val
+
+data['Daytype'] = data.apply(daytype, axis=1)
+data.head(5)
+findata = pd.get_dummies(data, drop_first=True, columns=data.select_dtypes(include=[object]).columns) 
+findata.to_csv('findata.csv')
+
+#1st Training
+dataset = pd.read_csv("findata")
+dataset.info()
+dataset = dataset.drop('Date', axis = 1)
+X = dataset.drop('Rented Bike Count', axis = 1).values
+y = dataset['Rented Bike Count'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+#1st Linear Regression
+lin_reg = LinearRegression()
+lin_reg.fit(X_train, y_train)
+scores = cross_val_score(lin_reg, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+lin_reg_scores = np.sqrt(-scores)
+print("Mean RMSE:", lin_reg_scores.mean())
+print("Standard deviation of RMSE:", lin_reg_scores.std())
+
+#1st Decision Tree
+dtr = DecisionTreeRegressor()
+dtr.fit(X_train, y_train)
+scores = cross_val_score(dtr, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+dtr_scores = np.sqrt(-scores)
+print("Mean RMSE:", dtr_scores.mean())
+print("Standard deviation of RMSE:", dtr_scores.std())
+
+#1st Random Forests
+rfr = RandomForestRegressor()
+rfr.fit(X_train, y_train)
+scores = cross_val_score(rfr, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+rfr_scores = np.sqrt(-scores)
+print("Mean RMSE:", rfr_scores.mean())
+print("Standard deviation of RMSE:", rfr_scores.std())
+
+data.columns
+
+def rainbit(row):
+  if row['Rainfall(mm)'] == 0:
+    val = 0
+  else:
+    val = 1
+  return val
+
+data['Rain'] = data.apply(rainbit, axis=1)
+
+def snowbit(row):
+  if row['Snowfall (cm)'] == 0:
+    val = 0
+  else:
+    val = 1
+  return val
+
+data['Snow'] = data.apply(snowbit, axis=1)
+data = data.drop('Solar Radiation (MJ/m2)', axis = 1)
+data = data.drop('Rainfall(mm)', axis = 1)
+data = data.drop('Snowfall (cm)', axis = 1)
+data = data.drop('Seasons', axis = 1)
+data = data.drop('Holiday', axis = 1)
+data = data.drop('Day', axis = 1)
+data = data.drop('Type of Day', axis = 1)
+data = data.drop('Combined Type of Day', axis = 1)
+findata2 = pd.get_dummies(data, drop_first=True, columns=data.select_dtypes(include=[object]).columns)
+findata2.to_csv('findata2.csv')
+
+#2nd Training
+dataset2 = pd.read_csv("findata2.csv")
+dataset2.info()
+dataset2 = dataset2.drop('Date', axis = 1)
+X = dataset2.drop('Rented Bike Count', axis = 1).values
+y = dataset2['Rented Bike Count'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+regressors = [LinearRegression(), DecisionTreeRegressor(), RandomForestRegressor()]
+column_names = ['Regressor', 'Mean RMSE']
+mean_rmse = pd.DataFrame(columns = column_names)
+
+for regressor in regressors:
+  scores = cross_val_score(regressor, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+  rmse = np.sqrt(-scores)
+  new_row = {'Regressor': regressor, 'Mean RMSE': rmse.mean()}
+  mean_rmse = mean_rmse.append(new_row, ignore_index = True)
+print(mean_rmse)
+
+xdata = data.columns[1:]
+allcombs = []
+for feature in range(0, len(xdata)+1):
+  for subset in itertools.combinations(xdata, feature):
+    allcombs.append(subset)
+allcombs.pop(0)
+
+column_names = ['Features', 'Number of Features', 'RMSE']
+allrmse = pd.DataFrame(columns = column_names)
+
+for subset in allcombs:
+  dataset = pd.DataFrame()
+  dataset['Rented Bike Count'] = data['Rented Bike Count']
+  for feature in subset:
+    dataset[feature] = data[feature]
+  findata = pd.get_dummies(dataset, drop_first=True, columns=dataset.select_dtypes(include=[object]).columns)
+  X = findata.drop('Rented Bike Count', axis = 1).values
+  y = findata['Rented Bike Count'].values
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+  rfr = RandomForestRegressor()
+  scores = cross_val_score(rfr, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+  rfr_scores = np.sqrt(-scores)
+  new_row = {'Features': subset, 'Number of Features': len(subset), 'RMSE': rfr_scores.mean()}
+  allrmse = allrmse.append(new_row, ignore_index = True)
+
+for val in allrmse['Number of Features'].unique():
+  for i in allrmse.groupby('Number of Features').get_group(val).sort_values(by='RMSE')['Features'].head(3).index:
+    print(allrmse.iloc[i]['Features'])
+
+for val in allrmse['Number of Features'].unique():
+  print('Number of Features: ', val, ' RMSE: ',allrmse.groupby('Number of Features').get_group(val)['RMSE'].min())
+
+data = data.drop('Wind speed (m/s)', axis = 1)
+data = data.drop('Visibility (10m)', axis = 1)
+data = data.drop('Snow', axis = 1)
+findata3 = pd.get_dummies(data, drop_first=True, columns=data.select_dtypes(include=[object]).columns)
+findata3.to_csv('findata3.csv')
+
+#3rd Training
+dataset3 = pd.read_csv("findata3.csv")
+dataset3 = dataset3.drop('Date', axis = 1)
+X = dataset3.drop('Rented Bike Count', axis = 1).values
+y = dataset3['Rented Bike Count'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+max_depth = [10, 15, 20]
+min_samples_split = [2, 5, 10]
+min_samples_leaf = [1, 2, 5]
+grid_param = {'max_depth': max_depth, 'min_samples_split': min_samples_split, 'min_samples_leaf': min_samples_leaf}
+rfr = RandomForestRegressor()
+grid_search = GridSearchCV(rfr, grid_param, cv=10, scoring='neg_mean_squared_error', return_train_score=True, n_jobs=-1)
+grid_search.fit(X_train, y_train)
+cvres = grid_search.cv_results_
+
+for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+  print(np.sqrt(-mean_score), params)
+
+#3rd Random Forests
+rfr = RandomForestRegressor(max_depth=15, min_samples_split=5, min_samples_leaf=2)
+rfr.fit(X_train, y_train)
+y_pred = rfr.predict(X_test)
+print('RMSE: ', mean_squared_error(y_test, y_pred, squared=False))
+
+#visualize tree
+fn=dataset3.drop('Rented Bike Count', axis = 1).columns
+cn=dataset3.columns[0]
+dot_data = StringIO()
+tree.export_graphviz(rfr.estimators_[0], feature_names = fn,  class_names=cn, filled = True, out_file=dot_data)
+graph = pydot.graph_from_dot_data(dot_data.getvalue())
+graph[0].write_pdf("tree.pdf")
+
+#Importance
+features = dataset3.drop('Rented Bike Count', axis = 1).columns
+importances = rfr.feature_importances_
+indices = np.argsort(importances)
+plt.title('Feature Importances')
+plt.barh(range(len(indices)), importances[indices], color='b', align='center')
+plt.yticks(range(len(indices)), [features[i] for i in indices])
+plt.xlabel('Relative Importance')
+plt.show()
