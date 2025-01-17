@@ -41,7 +41,7 @@ And we notice that these spikes appear only when people go to work, namely Hday,
 
 ## Training models
 
-For the training of our models we use the scikit-learn library. Because our dataset includes also text as values, it is required for our algorithms to use an encoding for those values and transform them into numerical ones. One popular options is the One-Hot encoding.
+For the training of our models we use the scikit-learn library. Because our dataset includes also text as values, it is required for our algorithms to use an encoding for those values and transform them into numerical ones. One popular option is the One-Hot encoding.
 After this transformation we save our data into a new variable, called dataset and we split the new variable into the dependent vector y (Rented Bike Count) and the independent matrix X.
 We further split these matrices into train and test matrices with a ratio of 80 and 20 respectively. (We train our models with 80% of the observations and we test them afterwards with the remaining 20%)
 We use a Linear Regression model and a Random Forest model and we realise that Random Forest results in a lower error score.
