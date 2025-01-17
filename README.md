@@ -1,6 +1,6 @@
 # Relationship Between Rental Bike Demand and Weather Data
 
-In this endeavor we used a open dataset to explore the relationship between weather data and rental bike demand.
+In this endeavor we used an open dataset to explore the relationship between weather data and rental bike demand.
 
 First things first, we give credit to the source of this open dataset, UC Irvine Machine Learning Repository. The dataset can be found here: https://archive.ics.uci.edu/dataset/560/seoul+bike+sharing+demand
 
